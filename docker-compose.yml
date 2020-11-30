@@ -2,12 +2,17 @@ version: "3"
 
 services:
   app:
+    container_name: scraper
     build:
       context: "."
       dockerfile: Dockerfile
     ports:
       - "80:80"
       - "8000:8000"
+    environment: 
+      ELASTIC_DB_HOST_NAME: elasticsearch
+      TOR_PROXY_HOST_NAME: tor
+      CSV_PATH: app/app/articles.csv
     volumes:
       - type: bind
         source: .
@@ -37,6 +42,7 @@ services:
         ipv4_address: 172.22.0.10
 
   tor:
+    container_name: tor
     image: dperson/torproxy
     hostname: tor
     restart: unless-stopped
