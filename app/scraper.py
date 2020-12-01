@@ -6,8 +6,16 @@ from elasticsearch.exceptions import ConnectionError
 import re
 import sys, os
 import threading
+import csv
 import time
+from dotenv import load_dotenv
+from tempfile import NamedTemporaryFile
+import shutil
+load_dotenv()
 
+ELASTIC_DB_HOST_NAME = os.environ.get("ELASTIC_DB_HOST_NAME")
+TOR_PROXY_HOST_NAME = os.environ.get("TOR_PROXY_HOST_NAME")
+CSV_PATH = os.environ.get("CSV_PATH")
 
 # the Article class
 class Article:
@@ -103,7 +111,6 @@ def get_all_articles(es_object):
 
 # checking if article exists in db by date
 def check_if_article_exsits(article ,existing_articles):
-    # print(article)
     try:
         for existing_article in existing_articles:
             if existing_article['_source']['date'] == article['date']:
@@ -118,12 +125,30 @@ def store_article(es_object, article):
 
 # updates an article by id
 def update_article(es_object, id ,article):
-        es_object.update(index="articles", doc_type="article", id=id, body={"doc": article})
+    es_object.update(index="articles", doc_type="article", id=id, body={"doc": article})
+
+def insert_all_from_csv(filepath, es_object):
+    fields = ['title', 'content', 'author', 'views', 'language', 'date']
+    existing_articles = get_all_articles(es_object)
+    with open(filepath, 'r', encoding='utf-8') as csvfile:
+        reader = csv.DictReader(csvfile, fieldnames=fields)
+        try:
+            for row in reader:
+                row = {'title': row['title'], 'content': row['content'], 'author': row['author'], 'views': row['views'], 'language': row['language'], 'date': row['date']}
+                views = re.findall(r'(\d+)', row['views'])
+                views = str(''.join(views))
+                row['views'] = views
+                article_exists = check_if_article_exsits(row, existing_articles)
+                if not article_exists['exists'] == True:
+                    store_article(es_object, row)
+        except UnicodeDecodeError:
+            pass
 
 proxies = {
-    'http': 'socks5h://tor:9050',
-    'https': 'socks5h://tor:9050'
+    'http': f'socks5h://{TOR_PROXY_HOST_NAME}:9050',
+    'https': f'socks5h://{TOR_PROXY_HOST_NAME}:9050'
 }
+
 
 def scraper(es_object):
     page_number = 1
@@ -158,28 +183,27 @@ def scraper(es_object):
                     author_name = re.findall(r"(?<=Posted by )(.*)(?= at)" , author_info)[0]
                     views = re.findall(r"\d+" , post_details)[0]
                     # language = re.findall(r"(?<=Language: )(.*)(?= •)" , post_details)
-                    # print(post_details)
                     date = re.findall(r"(?<=at )(.*)(?= UTC)" , author_info)[0]
-                    # print(title, content, author_name, views, date)   
                     newArticle = Article(title, content, author_name, views, language="text", date=date).get_info_for_post()
 
-                    # now we need to make sure the article is not exists, and if so to update it.
 
+                    # now we need to make sure the article is not exists, and if so to update it.
                     # checking if existing articles is  not empty:
                     if (len(existing_articles) > 0):
                         existing_article = check_if_article_exsits(newArticle, existing_articles)
                         if existing_article['exists'] == True:
-                            # print('OMG updated!!!!')
                             update_article(es_object, existing_article['id'], newArticle)
                             updated = updated + 1
                         else:
-                            # print('OMG posted!!!!')
                             store_article(es_object, newArticle)
                             added = added + 1
                     else:
-                        # print('OMG posted for the first time!!!!')
-                        store_article(es_object, newArticle)
-                        added = added + 1
+                        # checks again for the first update through csv
+                        existing_articles = get_all_articles(es_object)
+                        existing_article = check_if_article_exsits(newArticle, existing_articles)
+                        if existing_article['exists'] == False:
+                            store_article(es_object, newArticle)
+                            added = added + 1
             
 
                 except AttributeError:
@@ -187,7 +211,7 @@ def scraper(es_object):
                 except Exception as e:
                     exc_type, exc_obj, exc_tb = sys.exc_info()
                     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-                    print(exc_type, fname, exc_tb.tb_lineno)
+                    print(exc_type, fname, exc_tb.tb_lineno, e)
             
             print(f'Summarize for page {page_number}: ===> {added} articles added and {updated} articles updated')
 
@@ -205,12 +229,18 @@ def scraper(es_object):
         print("Site Not Available", e)        
 
 
-# defining elastic search object
 try:
-    es = Elasticsearch([{'host': 'elasticsearch', 'port': 9200}])
+    # defining elastic search object and creating index
+    es = Elasticsearch([{'host': f'{ELASTIC_DB_HOST_NAME}', 'port': 9200}])
     create_index(es)
+
+    # insert to elastic from csv on the first time
+    insert_all_from_csv(CSV_PATH ,es)
+
 except ConnectionError:
     print('try again later....')
+
+
 
 # make scraper works every 5 mins
 def interval_scraper():
