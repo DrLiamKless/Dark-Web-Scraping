@@ -1,0 +1,13 @@
+body {
+  background-color: rgb(26, 26, 26);
+  text-align: center;
+  color: white;
+  font-family: 'Texturina',
+    serif
+}
+
+.fixed {
+  position: fixed;
+  top: 10px;
+  text-align: center;
+}
