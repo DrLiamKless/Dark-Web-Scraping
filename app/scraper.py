@@ -127,37 +127,22 @@ def store_article(es_object, article):
 def update_article(es_object, id ,article):
     es_object.update(index="articles", doc_type="article", id=id, body={"doc": article})
 
-def update_in_csv(data, filepath):
-    updated = 0
-    tempfile = NamedTemporaryFile(mode='w', delete=False)
-    fields = ['title', 'content', 'author', 'views', 'language', 'date']
-
-    with open(filepath, 'r', ) as csvfile, tempfile:
-        reader = csv.DictReader(csvfile, fieldnames=fields)
-        writer = csv.DictWriter(tempfile, fieldnames=fields)
-        for row in reader:
-            if row['date'] == data['date'] and not row['views'] == data['views']:
-                print('updating row',  row['title'].strip(), 'inserting', data['views'], 'instead of', row['views'])
-                updated = updated + 1
-                row['views'] = data['views']
-            row = {'title': row['title'], 'content': row['content'], 'author': row['author'], 'views': row['views'], 'language': row['language'], 'date': row['date']}
-            writer.writerow(row)
-    shutil.move(tempfile.name, filepath)
-    return updated
-
 def insert_all_from_csv(filepath, es_object):
-    existing_articles = get_all_articles(es_object)
     fields = ['title', 'content', 'author', 'views', 'language', 'date']
-    with open(filepath, 'r', ) as csvfile:
+    existing_articles = get_all_articles(es_object)
+    with open(filepath, 'r', encoding='utf-8') as csvfile:
         reader = csv.DictReader(csvfile, fieldnames=fields)
-        for row in reader:
-            row = {'title': row['title'], 'content': row['content'], 'author': row['author'], 'views': row['views'], 'language': row['language'], 'date': row['date']}
-            views = re.findall(r'(\d+)', row['views'])
-            views = str(''.join(views))
-            row['views'] = views
-            existing_article = check_if_article_exsits(row, existing_articles)
-            if(existing_article['exists'] == False):
-                store_article(es_object, row)
+        try:
+            for row in reader:
+                row = {'title': row['title'], 'content': row['content'], 'author': row['author'], 'views': row['views'], 'language': row['language'], 'date': row['date']}
+                views = re.findall(r'(\d+)', row['views'])
+                views = str(''.join(views))
+                row['views'] = views
+                article_exists = check_if_article_exsits(row, existing_articles)
+                if not article_exists['exists'] == True:
+                    store_article(es_object, row)
+        except UnicodeDecodeError:
+            pass
 
 proxies = {
     'http': f'socks5h://{TOR_PROXY_HOST_NAME}:9050',
@@ -208,11 +193,9 @@ def scraper(es_object):
                         existing_article = check_if_article_exsits(newArticle, existing_articles)
                         if existing_article['exists'] == True:
                             update_article(es_object, existing_article['id'], newArticle)
-                            _updated = update_in_csv(newArticle, CSV_PATH)
-                            updated = updated + _updated
+                            updated = updated + 1
                         else:
                             store_article(es_object, newArticle)
-                            update_in_csv(newArticle, CSV_PATH)
                             added = added + 1
                     else:
                         # checks again for the first update through csv
@@ -220,7 +203,6 @@ def scraper(es_object):
                         existing_article = check_if_article_exsits(newArticle, existing_articles)
                         if existing_article['exists'] == False:
                             store_article(es_object, newArticle)
-                            update_in_csv(newArticle, CSV_PATH)
                             added = added + 1
             
 
@@ -257,6 +239,8 @@ try:
 
 except ConnectionError:
     print('try again later....')
+
+
 
 # make scraper works every 5 mins
 def interval_scraper():

@@ -15,8 +15,8 @@ services:
       CSV_PATH: app/app/articles.csv
     volumes:
       - type: bind
-        source: .
-        target: /app
+        source: ./app
+        target: /app/app
     command: sh -c '/app/app/wait_for_it.sh elasticsearch:9200 && /app/app/wait_for_it.sh tor:9050 && python app/app/scraper.py'
 
     networks:
