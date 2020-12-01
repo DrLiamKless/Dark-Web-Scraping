@@ -22,6 +22,7 @@ app.get("/api/all", (req, res) => {
       res.json(articles);
     });
 });
+
 app.get("/api/minutes", (req, res) => {
   let d = new Date();
   d.setHours(d.getHours() - 24);
