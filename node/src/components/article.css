@@ -1,7 +1,5 @@
 section {
     padding: 15px 10px;
-
-
 }
 
 h3 {
@@ -18,13 +16,10 @@ h3 {
     padding: 15px 15px;
     background-color: rgb(47, 47, 47);
     border-radius: 30px;
-    font-family: 'Roboto',
-        sans-serif;
-
+    font-family: 'Roboto',sans-serif;
 }
 
 span {
     padding: 15px 10px;
     text-align: center;
-
 }

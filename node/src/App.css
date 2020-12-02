@@ -2,12 +2,27 @@ body {
   background-color: rgb(26, 26, 26);
   text-align: center;
   color: white;
-  font-family: 'Texturina',
-    serif
+  font-family: 'Texturina',serif;
 }
 
-.fixed {
+.dashboard {
   position: fixed;
-  top: 10px;
+  top: 0;
+  width: 100%;
   text-align: center;
+}
+
+.Articles {
+  margin-top: 100px
+}
+
+.nav{
+  font-family: 'Texturina',serif;
+  box-shadow: 1px 1px 10px black;
+}
+
+.alerts {
+display: flex;
+flex-direction: column;
+align-items: center;
 }

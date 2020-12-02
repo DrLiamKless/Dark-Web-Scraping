@@ -1,4 +1,5 @@
 import requests
+import datetime
 import json
 from bs4 import BeautifulSoup
 from elasticsearch import Elasticsearch
@@ -11,21 +12,52 @@ import time
 from dotenv import load_dotenv
 from tempfile import NamedTemporaryFile
 import shutil
+import pandas as pd
 load_dotenv()
 
+# env variables
 ELASTIC_DB_HOST_NAME = os.environ.get("ELASTIC_DB_HOST_NAME")
 TOR_PROXY_HOST_NAME = os.environ.get("TOR_PROXY_HOST_NAME")
 CSV_PATH = os.environ.get("CSV_PATH")
 
+# keywords for labels
+weapon_keywords = {
+    'label': 'weapons',
+    'words':['weapon','weapons','gun','guns','kill','ammo','handguns','smgs','smg','assault','rifles','full auto']}
+pedophile_keywords = {
+    'label': 'pedophile',
+    'words':['girls','child','children','petite','cute','boy','girl','boys','little']}
+sexual_keywords = {
+    'label': 'sexual',
+    'words':['hot','sex','pretty','fuck','xs','xsxs','xsxsxsxs','xsxsx','xsx','porn','cutie','adult','p3do','princess']}
+money_keywords = {
+    'label': 'money',
+    'words':['bitcoin','wallets','market','money','invest','invest','buy','sell','visa','credit','cards','cash']}
+buisness_keywords = {
+    'label': 'buisness',
+    'words':['buy','sell','iphone','marketing']}
+social_media = {
+    'label': 'social_media',
+    'words':['facebook','instagram','twitter']}
+keywords=[
+    weapon_keywords,
+    pedophile_keywords,
+    sexual_keywords,
+    money_keywords,
+    buisness_keywords,
+    social_media
+]
+
 # the Article class
 class Article:
-    def __init__(self, title="no title", content="no content", author="Anonymous", views="no views", language="unknown", date="unknown"):
+    def __init__(self, title="no title", content="no content", author="Anonymous", views="no views", language="unknown", date="unknown", labels=''):
         self.title = title
         self.content = content
         self.author = author
         self.views = views
         self.language = language
         self.date = date
+        self.labels = labels
 
     def __str__(self):
         return f"title:{self.title},\n text:{self.content},\n author:{self.author},\n date:{self.date},\n views{self.views}\n\n"
@@ -38,6 +70,7 @@ class Article:
             'views': self.views,
             'language': self.language,
             'date': self.date,
+            'labels': self.labels
         }
 
 # creates new index, default = article
@@ -71,6 +104,9 @@ def create_index(es_object, index_name='articles'):
                     "date": {
                         "type": "text"
                     },
+                    "labels": {
+                        "type": "text"
+                    }
                 }
             }
         }
@@ -113,7 +149,7 @@ def get_all_articles(es_object):
 def check_if_article_exsits(article ,existing_articles):
     try:
         for existing_article in existing_articles:
-            if existing_article['_source']['date'] == article['date']:
+            if to_date(existing_article['_source']['date']) == article['date']:
                 return {'exists': True, 'id': existing_article['_id']}
         return  {'exists': False}
     except Exception as e:
@@ -127,28 +163,65 @@ def store_article(es_object, article):
 def update_article(es_object, id ,article):
     es_object.update(index="articles", doc_type="article", id=id, body={"doc": article})
 
+# insert data from csv file
 def insert_all_from_csv(filepath, es_object):
     fields = ['title', 'content', 'author', 'views', 'language', 'date']
     existing_articles = get_all_articles(es_object)
-    with open(filepath, 'r', encoding='utf-8') as csvfile:
+    with open(filepath, 'r') as csvfile:
         reader = csv.DictReader(csvfile, fieldnames=fields)
+        firstline = True
         try:
             for row in reader:
+                if firstline:
+                    firstline = False
+                    continue
                 row = {'title': row['title'], 'content': row['content'], 'author': row['author'], 'views': row['views'], 'language': row['language'], 'date': row['date']}
                 views = re.findall(r'(\d+)', row['views'])
                 views = str(''.join(views))
                 row['views'] = views
-                article_exists = check_if_article_exsits(row, existing_articles)
-                if not article_exists['exists'] == True:
+                date = row['date']
+                date = to_date(date)
+                row['date'] = date
+                row['labels'] = labelize_data(row['title']+row['author']+row['content'])
+                if(len(existing_articles) > 0):
+                    article_exists = check_if_article_exsits(row, existing_articles)
+                    if not article_exists['exists'] == True:
+                        store_article(es_object, row)
+                        print('stored from csv after check')
+                else:
                     store_article(es_object, row)
+                    print('stored from csv for the first time')
+                
         except UnicodeDecodeError:
+            print('theres a unicode error in csv file')
             pass
+
+# change date format
+def to_date(date):
+    d = pd.to_datetime(date)
+    return d
+
+# add labels to data
+def labelize_data(text, keywords=keywords):
+    labels = {}
+    text = text.lower()
+    for keywords_array in keywords:
+        for word in keywords_array['words']:
+            if(word in text):
+                label = keywords_array['label'] 
+                if(not label in labels):
+                    labels[label] = 1
+                else:
+                    labels[label] = labels[label] + 1
+    results = []                
+    for key, value in labels.items():
+        results.append(f'{key}-{value}')
+    return ' '.join(results)
 
 proxies = {
     'http': f'socks5h://{TOR_PROXY_HOST_NAME}:9050',
     'https': f'socks5h://{TOR_PROXY_HOST_NAME}:9050'
 }
-
 
 def scraper(es_object):
     page_number = 1
@@ -177,14 +250,16 @@ def scraper(es_object):
                 try:
                     author_info = article.find('div', {'class': 'col-sm-6'}).text.strip()
                     post_details = article.find('div', {'class': 'col-sm-6 text-right'}).text.strip()
-
                     title = article.find('h4').text.strip()
                     content = article.find('div', {'class': 'text'}).find('ol').text.strip()
                     author_name = re.findall(r"(?<=Posted by )(.*)(?= at)" , author_info)[0]
                     views = re.findall(r"\d+" , post_details)[0]
                     # language = re.findall(r"(?<=Language: )(.*)(?= •)" , post_details)
                     date = re.findall(r"(?<=at )(.*)(?= UTC)" , author_info)[0]
-                    newArticle = Article(title, content, author_name, views, language="text", date=date).get_info_for_post()
+                    date = to_date(date)
+                    labels = labelize_data(content+title+author_name)
+    
+                    newArticle = Article(title, content, author_name, views, language="text", date=date, labels=labels).get_info_for_post()
 
 
                     # now we need to make sure the article is not exists, and if so to update it.
@@ -206,12 +281,14 @@ def scraper(es_object):
                             added = added + 1
             
 
-                except AttributeError:
+                except AttributeError as e:
+                    print(e)
                     pass
                 except Exception as e:
                     exc_type, exc_obj, exc_tb = sys.exc_info()
                     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
                     print(exc_type, fname, exc_tb.tb_lineno, e)
+                    pass
             
             print(f'Summarize for page {page_number}: ===> {added} articles added and {updated} articles updated')
 
@@ -222,11 +299,13 @@ def scraper(es_object):
     except AttributeError:
         print(f'\noops...!\nit seems like page {page_number} not exists\nBye, Bye!')
         page_number = False
+        pass
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         print(exc_type, fname, exc_tb.tb_lineno, exc_obj)
-        print("Site Not Available", e)        
+        print("Site Not Available", e)
+        pass     
 
 
 try:
@@ -239,8 +318,7 @@ try:
 
 except ConnectionError:
     print('try again later....')
-
-
+    pass
 
 # make scraper works every 5 mins
 def interval_scraper():
