@@ -1,0 +1,11 @@
+FROM node:12
+WORKDIR /app
+
+ADD node/package.json /app/package.json
+RUN npm install
+
+ADD app/wait_for_it.sh /opt/wait_for_it.sh
+RUN chmod +x /opt/wait_for_it.sh
+EXPOSE 8080
+
+COPY ./node /app

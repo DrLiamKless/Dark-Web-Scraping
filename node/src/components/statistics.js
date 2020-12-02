@@ -6,6 +6,7 @@ export default function Statistics({articles, setArticles}) {
 
   return (
     <div className="statistics">
+      <h1>Statistics</h1>
     </div>
   );
 }

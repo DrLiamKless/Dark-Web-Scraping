@@ -52,6 +52,26 @@ services:
       frontapp_a:
         ipv4_address: 172.22.0.12
 
+  node:
+    build:
+      context: "."
+      dockerfile: Dockerfile.node
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./node:/app
+      - /app/node_modules/
+    command: sh -c '/opt/wait_for_it.sh elasticsearch:9200 && cd server && node .'
+    environment:
+      - ELASTIC_DB_HOST_NAME=elasticsearch
+      - API_HOST_NAME=localhost
+
+    networks:
+      frontapp_a:
+        ipv4_address: 172.22.0.13
+    depends_on:
+      - elasticsearch
+
 volumes:
   elasticsearch-data:
     driver: local

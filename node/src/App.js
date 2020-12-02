@@ -23,8 +23,8 @@ function App() {
           setArticles={setArticles}>
         </Dashboard>
         <Switch>
-          <Route path="/alerts"><Alerts setArticles={setArticles} articles={articles}/></Route>
-          <Route path="/statistics"><Statistics/></Route>
+          {/* <Route path="/alerts"><Alerts setArticles={setArticles} articles={articles}/></Route> */}
+          {/* <Route path="/statistics"><Statistics/></Route> */}
           <Route path="/"><Home setArticles={setArticles} articles={articles}/></Route>
         </Switch>
       </Router>

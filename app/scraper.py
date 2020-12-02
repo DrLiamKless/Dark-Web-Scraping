@@ -142,9 +142,13 @@ def get_all_articles(es_object):
         },
         'size': 9999
     }
-    results = es_object.search(index='articles', body=query)
-    return results['hits']['hits']
-
+    try:
+        results = es_object.search(index='articles', body=query)
+        return results['hits']['hits']
+    except Exception as e:
+        print(e)
+        pass
+    
 # checking if article exists in db by date
 def check_if_article_exsits(article ,existing_articles):
     try:

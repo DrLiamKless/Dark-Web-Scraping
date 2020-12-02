@@ -6,6 +6,10 @@ const app = express();
 
 app.use(express.json());
 
+const path = require('path');
+
+app.use(express.static(path.join(__dirname, 'build')));
+
 app.get("/api/es/last24h", async (req, res) => {
 
   try{
@@ -69,6 +73,10 @@ app.get("/api/es/labels/:label", async (req, res) => {
       }
     })
   res.json(body['hits']['hits'].map(hit=>hit._source))
+});
+
+app.get('/*', function (req, res) {
+  res.sendFile(path.join(__dirname, 'build', 'index.html'));
 });
 
 module.exports = app;

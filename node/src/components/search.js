@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { Button, FormControl } from "react-bootstrap";
+import useDebounce from '../hooks/debounce'
 
 export default function Search({searchInput, setSearchInput, setArticles, formfields}) {
+  const debouncedSearchInput = useDebounce(searchInput, 500);
 
   useEffect(() => {
-    if(searchInput) {
+    if(debouncedSearchInput) {
       (async () => {
         const { data } = await axios.get(
-          `http://localhost:8080/api/es/search/${searchInput}?label=${formfields.labels}`
+          `http://localhost:8080/api/es/search/${searchInput} `
           );
           setArticles(data);
         })();
@@ -20,7 +22,7 @@ export default function Search({searchInput, setSearchInput, setArticles, formfi
           setArticles(data);
         })();
     }
-  }, [searchInput]);
+  }, [debouncedSearchInput]);
 
   return (
     <>
