@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { Button, FormControl } from "react-bootstrap";
 import useDebounce from '../hooks/debounce'
+require('dotenv').config()
 
 export default function Search({searchInput, setSearchInput, setArticles, formfields}) {
   const debouncedSearchInput = useDebounce(searchInput, 500);
@@ -27,6 +28,7 @@ export default function Search({searchInput, setSearchInput, setArticles, formfi
   return (
     <>
       <FormControl 
+        style={{marginTop:'4px'}}
         type="text"
         placeholder="Search..." 
         className="mr-sm-2"

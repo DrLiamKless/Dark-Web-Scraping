@@ -2,6 +2,8 @@ import axios from "axios";
 import React from "react";
 import { useEffect } from "react";
 import Articles from "./articles";
+import './home.css'
+require('dotenv').config()
 
 export default function Home({articles, setArticles}) {
 

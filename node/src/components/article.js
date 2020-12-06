@@ -12,7 +12,7 @@ export default function Article({
   labels
 }) {
   return (
-    <div class="article">
+    <div className="article">
       <h3>{title}</h3>
       <span>{author}</span>
       <section>{content}</section>
@@ -22,12 +22,13 @@ export default function Article({
       <br></br>
       <br></br>
       <span>{date}</span>
-      {labels && labels.map(label => {
+      {labels && labels.map((label,i) => {
         label = label.split('-');
         label = {name: label[0], strong:label[1]}
         return(
           <Badge 
             pill
+            key={i}
             variant={label.strong > 2 ? 'danger' : 'warning'}
             style={{margin:'2px'}}>
             {label.name}

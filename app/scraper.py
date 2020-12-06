@@ -102,7 +102,7 @@ def create_index(es_object, index_name='articles'):
                         "type": "text"
                     },
                     "date": {
-                        "type": "text"
+                        "type": "date"
                     },
                     "labels": {
                         "type": "text"
@@ -311,7 +311,7 @@ def scraper(es_object):
         print("Site Not Available", e)
         pass     
 
-
+# connecting to elastic:
 try:
     # defining elastic search object and creating index
     es = Elasticsearch([{'host': f'{ELASTIC_DB_HOST_NAME}', 'port': 9200}])

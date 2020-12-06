@@ -5,7 +5,7 @@ export default function Articles({articles}) {
   return (
     <div className="Articles">
     {articles &&
-      articles.map((article) => {
+      articles.map((article, i) => {
         const { title, content, author, views, language, date, labels } = article;
         return (
           <Article
@@ -16,6 +16,7 @@ export default function Articles({articles}) {
             language={language}
             date={date.replace('T', ' / ')}
             labels={labels.split(' ')}
+            key={i}
           />
           );
         })}  
